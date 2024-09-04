@@ -7,18 +7,20 @@ import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
 from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 
 train_data_path = r"C:\baigiamasis\Final_Training"
 test_data_path = r"C:\baigiamasis\Final_Test"
-test_csv_path = r"C:\baigiamasis\GT-final_test.csv"
+test_csv_path = r"C:\baigiamasis\Final_Test\GT-final_test.csv"
 
 def load_training_data(base_path):
     data = []
     labels = []
 
     folders = os.listdir(base_path)
-    
     for folder in folders:
         folder_path = os.path.join(base_path, folder)
 
@@ -60,8 +62,16 @@ X_test = X_test.astype('float32') / 255.0
 y_train = to_categorical(y_train)
 y_test = to_categorical(y_test)
 
-model = Sequential()
+# Duomenų padidinimas (Data Augmentation)
+datagen = ImageDataGenerator(
+    # rotation_range=2,       # Sukimas
+    # width_shift_range=0.02,   # Horizontalus padėties keitimas
+    # height_shift_range=0.02,  # Vertikalus padėties keitimas
+    # brightness_range=[0.99, 1.01],  # Šviesumo keitimas
+    # horizontal_flip=True     # Horizontalus apvertimas
+)
 
+model = Sequential()
 model.add(Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3)))
 model.add(MaxPooling2D((2, 2)))
 model.add(Conv2D(64, (3, 3), activation='relu'))
@@ -74,16 +84,26 @@ model.add(Dense(128, activation='relu'))
 model.add(Dropout(0.5))
 model.add(Dense(43, activation='softmax'))  
 
-model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+optimizer = Adam(learning_rate=0.001)
+model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
 
 model.summary()
 
 X_train_split, X_val_split, y_train_split, y_val_split = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
 
-history = model.fit(X_train_split, y_train_split, epochs=30, batch_size=64, validation_data=(X_val_split, y_val_split))
+early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+
+history = model.fit(
+    datagen.flow(X_train_split, y_train_split, batch_size=64),
+    validation_data=(X_val_split, y_val_split),
+    epochs=30,
+    callbacks=[early_stopping]
+)
 
 test_loss, test_acc = model.evaluate(X_test, y_test)
 print(f"Testavimo rinkinio tikslumas: {test_acc * 100:.2f}%")
+
+
 
 plt.figure(figsize=(12, 4))
 
