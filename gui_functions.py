@@ -3,7 +3,7 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from model import create_model, save_model, load_model
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.utils import to_categorical
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, simpledialog
 import matplotlib.pyplot as plt
 from PIL import Image, ImageTk
 import numpy as np
@@ -28,8 +28,12 @@ classes = {
     41:'End of no passing', 42:'End no passing veh > 3.5 tons' 
 }
 
+from sklearn.metrics import classification_report
+
+import threading
+
 def start_training():
-    def run_training():
+    def run_training(epochs):
         global model, history, X_train_split, y_train_split, X_val_split, y_val_split, X_test, y_test, datagen, test_acc
         try:
             X_train, y_train = load_training_data(train_data_path)
@@ -41,7 +45,14 @@ def start_training():
             y_train = to_categorical(y_train)
             y_test = to_categorical(y_test)
 
-            datagen = ImageDataGenerator()
+            datagen = ImageDataGenerator(
+                rotation_range=10,
+                zoom_range=0.15,
+                width_shift_range=0.1,
+                height_shift_range=0.1,
+                shear_range=0.15,
+                fill_mode="nearest"
+            )
 
             X_train_split, X_val_split, y_train_split, y_val_split = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
 
@@ -50,7 +61,7 @@ def start_training():
             history = model.fit(
                 datagen.flow(X_train_split, y_train_split, batch_size=64),
                 validation_data=(X_val_split, y_val_split),
-                epochs=10
+                epochs=epochs
             )
 
             test_loss, test_acc = model.evaluate(X_test, y_test)
@@ -58,10 +69,55 @@ def start_training():
 
             save_model(model, 'traffic_sign_model.h5')
 
+            plt.figure(figsize=(12, 4))
+
+            plt.subplot(1, 2, 1)
+            plt.plot(history.history['accuracy'], label='accuracy')
+            plt.plot(history.history['val_accuracy'], label='val_accuracy')
+            plt.xlabel('Epoch')
+            plt.ylabel('Accuracy')
+            plt.legend(loc='lower right')
+            plt.title('Accuracy')
+
+            plt.subplot(1, 2, 2)
+            plt.plot(history.history['loss'], label='training_loss')
+            plt.plot(history.history['val_loss'], label='val_loss')
+            plt.xlabel('Epoch')
+            plt.ylabel('Loss')
+            plt.legend(loc='upper right')
+            plt.title('Loss')
+
+            plt.tight_layout()
+            plt.show()
+
+            y_test_pred = model.predict(X_test)
+            y_test_pred_classes = np.argmax(y_test_pred, axis=1)
+            y_test_true_classes = np.argmax(y_test, axis=1)
+
+            report = classification_report(y_test_true_classes, y_test_pred_classes, target_names=[classes[i] for i in range(len(classes))])
+            print("Classification Report:\n", report)
+
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
 
-    threading.Thread(target=run_training).start()
+    def get_epoch_selection():
+        epoch_options = {
+            '10': 10,
+            '20': 20,
+            '30': 30
+        }
+
+        choice = simpledialog.askstring("Select Epochs", "Enter the number of epochs:\n10 (5min)\n20 (7min)\n30 (10min)")
+
+        if choice in epoch_options:
+            epochs = epoch_options[choice]
+            estimated_time = "5 minutes" if epochs == 10 else "7 minutes" if epochs == 20 else "10 minutes"
+            messagebox.showinfo("Info", f"Training with {epochs} epochs. Estimated time: {estimated_time}.")
+            threading.Thread(target=run_training, args=(epochs,)).start()
+        else:
+            messagebox.showwarning("Invalid Selection", "Please enter a valid number of epochs (10, 20, or 30).")
+
+    get_epoch_selection()
 
 def load_existing_model():
     global model
