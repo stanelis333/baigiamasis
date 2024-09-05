@@ -2,8 +2,9 @@ from data_loader import load_training_data, load_test_data, train_data_path, tes
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from model import create_model, save_model, load_model
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, accuracy_score
 from tensorflow.keras.utils import to_categorical
+from sklearn.ensemble import RandomForestClassifier
 from tkinter import filedialog, messagebox, simpledialog
 import matplotlib.pyplot as plt
 from PIL import Image, ImageTk
@@ -75,7 +76,10 @@ def start_training():
             y_test_true_classes = np.argmax(y_test, axis=1)
 
             report = classification_report(y_test_true_classes, y_test_pred_classes, target_names=[classes[i] for i in range(len(classes))])
-            print("Classification Report:\n", report)
+            print("CNN Classification Report:\n", report)
+
+    
+            train_random_forest(X_train_split, y_train_split, X_test, y_test)
 
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
@@ -98,6 +102,25 @@ def start_training():
             messagebox.showwarning("Invalid Selection", "Please enter a valid number of epochs (10, 20, or 30).")
 
     get_epoch_selection()
+
+def train_random_forest(X_train, y_train, X_test, y_test):
+    X_train_flat = X_train.reshape(X_train.shape[0], -1)
+    X_test_flat = X_test.reshape(X_test.shape[0], -1)
+
+    y_train_flat = np.argmax(y_train, axis=1)
+    y_test_flat = np.argmax(y_test, axis=1)
+
+    rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+    
+    rf_model.fit(X_train_flat, y_train_flat)
+   
+    y_pred = rf_model.predict(X_test_flat)
+    
+    rf_accuracy = accuracy_score(y_test_flat, y_pred)
+    print(f"Random Forest Model Accuracy: {rf_accuracy:.2f}")
+    
+    print("Random Forest Classification Report:\n", classification_report(y_test_flat, y_pred))
+
 
 def load_existing_model():
     global model
