@@ -1,8 +1,4 @@
 from tkinter import *
-from tkinter import filedialog, messagebox
-import threading
-import cv2
-from PIL import Image, ImageTk
 from gui_functions import start_training, load_existing_model, upload_and_classify, show_data_distribution
 
 root = Tk()
