@@ -10,12 +10,12 @@ import pandas as pd
 import numpy as np
 import random
 import os
-
 from tkinter import *
 from tkinter import filedialog, messagebox
 import threading
 import cv2
 from PIL import Image, ImageTk
+import matplotlib.pyplot as plt  # Added for plotting
 
 seed = 42
 tf.random.set_seed(seed)
@@ -44,7 +44,6 @@ classes = {
     41:'End of no passing', 42:'End no passing veh > 3.5 tons' 
 }
 
-# Function to load training data
 def load_training_data(base_path):
     data = []
     labels = []
@@ -99,6 +98,41 @@ def create_model():
     
     return model
 
+def save_model(model, filepath):
+    model.save(filepath)
+
+def load_model(filepath):
+    return tf.keras.models.load_model(filepath)
+
+# Function to show data distribution
+def show_data_distribution():
+    try:
+        folders = os.listdir(train_data_path)
+        train_number = []
+        class_num = []
+
+        for folder in folders:
+            train_files = os.listdir(os.path.join(train_data_path, folder))
+            train_number.append(len(train_files))  # Number of images in the folder
+            class_num.append(classes[int(folder)])  # Class name based on folder number
+
+        zipped_lists = zip(train_number, class_num)
+        sorted_pairs = sorted(zipped_lists)
+        train_number, class_num = zip(*sorted_pairs)
+
+        # Plot the class distribution
+        plt.figure(figsize=(21, 10))
+        plt.bar(class_num, train_number)
+        plt.xticks(rotation='vertical')
+        plt.xlabel('Traffic Sign Classes')
+        plt.ylabel('Number of Images')
+        plt.title('Training Data Distribution')
+        plt.tight_layout()
+        plt.show()
+
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred while generating the graph: {e}")
+
 root = Tk()
 root.title("CNN Training and Classification")
 root.geometry("600x600")
@@ -116,8 +150,7 @@ def start_training():
             y_train = to_categorical(y_train)
             y_test = to_categorical(y_test)
 
-            datagen = ImageDataGenerator(
-            )
+            datagen = ImageDataGenerator()
 
             X_train_split, X_val_split, y_train_split, y_val_split = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
 
@@ -133,10 +166,22 @@ def start_training():
             )
             test_loss, test_acc = model.evaluate(X_test, y_test)
             accuracy_label.config(text=f"Test Accuracy: {test_acc * 100:.2f}%")
+
+            save_model(model, 'traffic_sign_model.h5')
+            messagebox.showinfo("Success", "Model trained and saved as 'traffic_sign_model.h5'")
+
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
     
     threading.Thread(target=run_training).start()
+
+def load_existing_model():
+    global model
+    try:
+        model = load_model('traffic_sign_model.h5')
+        messagebox.showinfo("Success", "Model loaded successfully!")
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred: {e}")
 
 def upload_and_classify():
     file_path = filedialog.askopenfilename()
@@ -158,11 +203,17 @@ def upload_and_classify():
 
         result_label.config(text=f"Predicted Class: {predicted_class_name}")
 
-train_button = Button(root, text="Start Training", command=start_training)
+train_button = Button(root, text="Train New Model", command=start_training)
 train_button.pack(pady=20)
+
+load_button = Button(root, text="Load Existing Model", command=load_existing_model)
+load_button.pack(pady=20)
 
 upload_button = Button(root, text="Upload and Classify Image", command=upload_and_classify)
 upload_button.pack(pady=20)
+
+distribution_button = Button(root, text="Show Data Distribution", command=show_data_distribution)
+distribution_button.pack(pady=20)
 
 accuracy_label = Label(root, text="")
 accuracy_label.pack(pady=10)
